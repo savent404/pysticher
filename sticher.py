@@ -8,7 +8,7 @@ import debug
 
 
 class sticher_runner(threading.Thread):
-    def __init__(self, factory: FrameFactory, frameseq_list: list):
+    def __init__(self, factory: FrameFactory, frameseq_list: List[FrameSequence]):
         threading.Thread.__init__(self)
         self.m_factory = factory
         self.m_seq_list = frameseq_list
@@ -17,7 +17,7 @@ class sticher_runner(threading.Thread):
     def run(self):
         factory = self.m_factory
         seq_list = self.m_seq_list
-        seq:FrameSequence = seq_list[-1]
+        seq = seq_list[-1]
 
         while factory.is_eof() is not True:
             frame = factory.get_frame()
@@ -26,19 +26,18 @@ class sticher_runner(threading.Thread):
                 seq = FrameSequence()
                 self.m_seq_list.append(seq)
                 seq.add_frame(frame)
-            
+
             # Debug
             debug.display('preFrame', frame.get_image())
 
 
-
 class Sticher:
-    def __init__(self, factories: list):
+    def __init__(self, factories: List[FrameFactory]):
         self.m_factories = factories
-        self.m_frameseq = []
+        self.m_frameseq: List[FrameSequence] = []
         for _ in range(len(factories)):
             frame_list = []
-            frame_list.append(FrameSequence)
+            frame_list.append(FrameSequence())
             self.m_frameseq.append(frame_list)
 
         self.m_runners = []
@@ -49,17 +48,17 @@ class Sticher:
     def run(self):
         for r in self.m_runners:
             r.start()
-        
+
         for r in self.m_runners:
             r.join()
-    
+
     def get_map(self, is_final=False):
         '''
         获取地图
         '''
         return np.uint8((1, 1, 3))
-    
-    def download_map(self, file_path:str):
+
+    def download_map(self, file_path: str):
         '''
         下载地图到文件
         '''
