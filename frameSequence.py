@@ -33,10 +33,15 @@ class FrameSequenceInterface(FrameInterface):
         super.__init__(self)
     def add_frame(self, frame, match_ratio=0.6, max_residual=3):
         pass
+
 class GpuFrameSequence(FrameSequenceInterface):
     def __init__(self):
         FrameInterface.__init__(self)
         self.m_frame_list: List[Frame] = []
+    def clear_cache(self):
+        for f in self.m_frame_list:
+            f.clear_cache()
+        return super().clear_cache()
 
     def __estimate_rigid_transform(self, frame:Frame, max_residual):
         list = self.m_frame_list
@@ -148,7 +153,7 @@ class GpuFrameSequence(FrameSequenceInterface):
 
         # 通常来讲上一帧只需要和当前帧做匹配，所以这里就可以gpu缓存了
         # 当前帧的不进行清除，gpu缓存留到下一帧
-        last_frame.clear_gpu_cache()
+        last_frame.clear_cache()
         M = last_frame.get_M()
         M = np.dot(M, proj_m)
         frame.set_M(M)

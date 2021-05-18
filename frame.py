@@ -60,6 +60,12 @@ class FrameInterface:
     def merge(self, frame):
         pass
 
+    def clear_cache(self):
+        '''
+        清除缓存（即为了加速自动添加到class上的内容）
+        '''
+        pass
+
     def decomposeM(self, M):
         r, _, t = cv.decomposeEssentialMat(M)
         return r, t
@@ -73,7 +79,6 @@ class Frame(FrameInterface):
         self.m_img = image
         self.m_kp = None
         self.m_desc = None
-        self.m_gpu_desc = None
     
     def set_image(self, img):
         '''
@@ -87,6 +92,11 @@ class Frame(FrameInterface):
     def __get_detector(self):
         return cv.xfeatures2d.SURF_create(5)
 
+    def clear_cache(self):
+        self.m_kp = None
+        self.m_desc = None
+        super().clear_cache()
+
     def _get_kp_and_desc(self):
         detector = self.__get_detector()
         img = self.m_img
@@ -99,7 +109,6 @@ class Frame(FrameInterface):
         self.m_desc = desc
         return kp, desc
 
- 
     def get_kp(self):
         if self.m_desc is None:
             self._get_kp_and_desc()
@@ -140,8 +149,9 @@ class GpuFrame(Frame):
         a.upload(self.m_img)
         return a
     
-    def clear_gpu_cache(self):
+    def clear_cache(self):
         self.m_gpu_desc = None
+        return super().clear_cache()
 
     def get_kp_description(self):
         if self.m_gpu_desc is None or self.m_desc is None:
