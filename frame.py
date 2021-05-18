@@ -7,9 +7,17 @@ class FrameInterface:
         self.m_img = None
         self.m_kp = None
         self.m_desc = None
+        self.m_M = None
         self.m_R = None
         self.m_T = None
 
+    def get_M(self):
+        return self.m_M
+    
+    def set_M(self, M):
+        self.m_M = M;
+        self.m_R, self.m_T = self.decomposeM(M)
+    
     def get_R(self):
         '''
         获取旋转矩阵
@@ -49,11 +57,19 @@ class FrameInterface:
     def get_kp_description(self):
         return self.m_desc
 
+    def merge(self, frame):
+        pass
+
+    def decomposeM(self, M):
+        r, _, t = cv.decomposeEssentialMat(M)
+        return r, t
+
 class Frame(FrameInterface):
     def __init__(self, image = np.array((1, 1, 3), dtype=np.uint8), camPara=CameraParameter()):
         FrameInterface.__init__(self)
         self.m_R = camPara.outer[:3, :3]
         self.m_T = camPara.outer[:3, 3]
+        self.m_M = camPara.outer[0:3, 0:3]
         self.m_img = image
         self.m_kp = None
         self.m_desc = None
@@ -100,6 +116,7 @@ class GpuFrame(Frame):
         FrameInterface.__init__(self)
         self.m_R = camPara.outer[:3, :3]
         self.m_T = camPara.outer[:3, 3]
+        self.m_M = camPara.outer[0:3, 0:3]
         self.m_kp = None
         self.m_desc = None
         self.m_img = img
