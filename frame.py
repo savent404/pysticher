@@ -128,8 +128,18 @@ class GpuFrame(Frame):
         if self.m_desc is None:
             self._get_kp_and_desc()
         return gpu_feature_detector.downloadKeypoints(self.m_kp)
+    
+    def get_gpu_kp(self):
+        if self.m_desc is None:
+            self._get_kp_and_desc()
+        return gpu_feature_detector
 
     def get_kp_description(self):
         if self.m_desc is None:
             self._get_kp_and_desc()
         return self.m_desc.download()
+    
+    def get_gpu_kp_description(self):
+        if self.m_desc is None:
+            self._get_kp_and_desc()
+        return self.m_desc

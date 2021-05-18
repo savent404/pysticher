@@ -1,6 +1,6 @@
 from typing import List
 from frameFactory import FrameFactory
-from frameSequence import FrameSequence
+from frameSequence import GpuFrameSequence
 import cv2 as cv
 import numpy as np
 import threading
@@ -8,7 +8,7 @@ import debug
 import copy
 
 class sticher_runner(threading.Thread):
-    def __init__(self, factory: FrameFactory, frameseq_list: List[FrameSequence]):
+    def __init__(self, factory: FrameFactory, frameseq_list: List[GpuFrameSequence]):
         threading.Thread.__init__(self)
         self.m_factory = factory
         self.m_seq_list = frameseq_list
@@ -21,10 +21,10 @@ class sticher_runner(threading.Thread):
 
         while factory.is_eof() is not True:
             timer = debug.DebugTimer()
-            frame = factory.get_frame()
+            frame = factory.get_frame(isGpu=True)
             if seq.add_frame(frame) is False:
                 # create a new seq
-                seq = FrameSequence()
+                seq = GpuFrameSequence()
                 self.m_seq_list.append(seq)
                 seq.add_frame(frame)
             print("duration: {}".format(timer.duration()))
@@ -36,10 +36,10 @@ class sticher_runner(threading.Thread):
 class Sticher:
     def __init__(self, factories: List[FrameFactory]):
         self.m_factories = factories
-        self.m_frameseq: List[FrameSequence] = []
+        self.m_frameseq: List[GpuFrameSequence] = []
         for _ in range(len(factories)):
             frame_list = []
-            frame_list.append(FrameSequence())
+            frame_list.append(GpuFrameSequence())
             self.m_frameseq.append(frame_list)
 
         self.m_runners = []

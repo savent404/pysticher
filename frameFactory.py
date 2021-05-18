@@ -41,7 +41,7 @@ class SimulateFrameFactory(FrameFactory):
         self.m_index = 0
         self.m_cam_param = camParam
 
-    def get_frame(self):
+    def get_frame(self, isGpu=False):
         if self.is_eof():
             return None
 
@@ -54,8 +54,11 @@ class SimulateFrameFactory(FrameFactory):
             img = self.__calibration(img)
             self.m_index = self.m_index + 1
             cam_param = copy.copy(self.m_cam_param)
-        # return Frame(img, cam_param)
-        return GpuFrame(img, cam_param)
+        
+        if isGpu:
+            return GpuFrame(img, cam_param)
+        else:
+            return Frame(img, cam_param)
 
     def is_eof(self):
         '''
