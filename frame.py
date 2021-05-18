@@ -2,49 +2,134 @@ import numpy as np
 import cv2 as cv
 from cameraParameter import CameraParameter
 
-class Frame:
-    def __init__(self, image = np.array((1, 1, 3), dtype=np.uint8), camPara=CameraParameter()):
-        self.m_R = camPara.outer[:3, :3]
-        self.m_T = camPara.outer[:3, 3]
-        self.m_img = image
+cpu_feature_detector = cv.xfeatures2d.SURF_create(5)
+gpu_feature_detector = cv.cuda.SURF_CUDA_create(5)
+
+class FrameInterface:
+    def __init__(self):
+        self.m_img = None
         self.m_kp = None
         self.m_desc = None
+        self.m_R = None
+        self.m_T = None
 
     def get_R(self):
         '''
         获取旋转矩阵
         '''
         return self.m_R
-    
+
+    def set_R(self, R):
+        '''
+        更新旋转矩阵
+        '''
+        self.m_R = R
+
     def get_T(self):
         '''
         获取平移矩阵
         '''
         return self.m_T
-    
+
+    def set_T(self, T):
+        '''
+        设置平移矩阵
+        '''
+        self.m_T = T
+
     def get_image(self):
         '''
         获取图像本身
         '''
         return self.m_img
     
-    def __get_keypoints_and_description(self):
-        detector = cv.xfeatures.SIFT_create()
-        gray = cv.cvtColor(self.m_img, cv.COLOR_BGR2GRAY)
+    def set_image(self, img):
+        self.m_img = img
 
+    def get_kp(self):
+        return self.m_kp
+
+    def get_kp_description(self):
+        return self.m_desc
+
+class Frame(FrameInterface):
+    def __init__(self, image = np.array((1, 1, 3), dtype=np.uint8), camPara=CameraParameter()):
+        FrameInterface.__init__(self)
+        self.m_R = camPara.outer[:3, :3]
+        self.m_T = camPara.outer[:3, 3]
+        self.m_img = image
+        self.m_kp = None
+        self.m_desc = None
+    
+    def set_image(self, img):
+        '''
+        设置图像
+        '''
+        self.m_desc = None
+        self.m_kp = None
+        # self.m_img = img
+        FrameInterface.set_image(self, img)
+
+    def _get_kp_and_desc(self):
+        detector = cpu_feature_detector
+        img = self.m_img
+        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         _, mask = cv.threshold(gray, 1, 255, cv.THRESH_BINARY)
         kp, desc = detector.detectAndCompute(gray, mask)
+
+        # write cache
+        self.m_kp = kp
+        self.m_desc = desc
         return kp, desc
 
  
     def get_kp(self):
         if self.m_desc is None:
-            self.__get_keypoints_and_description()
-        return self.m_kp
+            self._get_kp_and_desc()
+        return FrameInterface.get_kp(self)
     
     def get_kp_description(self):
         if self.m_desc is None:
-            self.__get_keypoints_and_description()
-        return self.m_desc
+            self._get_kp_and_desc()
+        return FrameInterface.get_kp_description(self)
 
 
+class GpuFrame(Frame):
+    def __init__(self, img, camPara=CameraParameter()):
+        FrameInterface.__init__(self)
+        self.m_R = camPara.outer[:3, :3]
+        self.m_T = camPara.outer[:3, 3]
+        self.m_kp = None
+        self.m_desc = None
+        a = cv.cuda_GpuMat()
+        a.upload(img)
+        self.m_img = a
+
+    def set_image(self, img):
+        self.m_desc = None
+        self.m_kp = None
+        self.m_img = cv.cuda_GpuMat(img)
+
+    def get_image(self):
+        return self.m_img.download()
+
+    def _get_kp_and_desc(self):
+        detector = gpu_feature_detector
+        img = self.m_img
+        gray = cv.cuda.cvtColor(img, cv.COLOR_BGR2GRAY)
+        _, mask = cv.cuda.threshold(gray, 1, 255, cv.THRESH_BINARY)
+        kp, desc = detector.detectWithDescriptors(gray, mask)
+        # write cache
+        self.m_kp = kp
+        self.m_desc = desc
+        return kp, desc
+    
+    def get_kp(self):
+        if self.m_desc is None:
+            self._get_kp_and_desc()
+        return gpu_feature_detector.downloadKeypoints(self.m_kp)
+
+    def get_kp_description(self):
+        if self.m_desc is None:
+            self._get_kp_and_desc()
+        return self.m_desc.download()

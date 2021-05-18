@@ -5,7 +5,7 @@ import cv2 as cv
 import numpy as np
 import threading
 import debug
-
+import copy
 
 class sticher_runner(threading.Thread):
     def __init__(self, factory: FrameFactory, frameseq_list: List[FrameSequence]):
@@ -20,16 +20,18 @@ class sticher_runner(threading.Thread):
         seq = seq_list[-1]
 
         while factory.is_eof() is not True:
+            timer = debug.DebugTimer()
             frame = factory.get_frame()
             if seq.add_frame(frame) is False:
                 # create a new seq
                 seq = FrameSequence()
                 self.m_seq_list.append(seq)
                 seq.add_frame(frame)
-
+            print("duration: {}".format(timer.duration()))
             # Debug
-            debug.display('preFrame', frame.get_image())
-
+            debug_img = copy.copy(frame.get_image())
+            cv.drawKeypoints(frame.get_image(), frame.get_kp(), debug_img)
+            debug.display('preFrame', debug_img)
 
 class Sticher:
     def __init__(self, factories: List[FrameFactory]):

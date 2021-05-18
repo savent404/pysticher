@@ -1,5 +1,5 @@
 from cameraParameter import CameraParameter
-from frame import Frame
+from frame import Frame, GpuFrame
 import numpy as np
 import cv2 as cv
 import copy
@@ -54,7 +54,8 @@ class SimulateFrameFactory(FrameFactory):
             img = self.__calibration(img)
             self.m_index = self.m_index + 1
             cam_param = copy.copy(self.m_cam_param)
-        return Frame(img, cam_param)
+        # return Frame(img, cam_param)
+        return GpuFrame(img, cam_param)
 
     def is_eof(self):
         '''
