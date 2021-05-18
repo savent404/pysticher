@@ -128,6 +128,7 @@ class GpuFrameSequence(FrameSequenceInterface):
             return True
         
         rigid_m = self.__estimate_rigid_transform(frame, max_residual)
+        frame.clear_gpu_cache()
         # TODO update frame.....
         list.append(frame)
         return True

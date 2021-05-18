@@ -2,9 +2,6 @@ import numpy as np
 import cv2 as cv
 from cameraParameter import CameraParameter
 
-cpu_feature_detector = cv.xfeatures2d.SURF_create(5)
-gpu_feature_detector = cv.cuda.SURF_CUDA_create(5)
-
 class FrameInterface:
     def __init__(self):
         self.m_img = None
@@ -60,6 +57,7 @@ class Frame(FrameInterface):
         self.m_img = image
         self.m_kp = None
         self.m_desc = None
+        self.m_gpu_desc = None
     
     def set_image(self, img):
         '''
@@ -70,8 +68,11 @@ class Frame(FrameInterface):
         # self.m_img = img
         FrameInterface.set_image(self, img)
 
+    def __get_detector(self):
+        return cv.xfeatures2d.SURF_create(5)
+
     def _get_kp_and_desc(self):
-        detector = cpu_feature_detector
+        detector = self.__get_detector()
         img = self.m_img
         gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         _, mask = cv.threshold(gray, 1, 255, cv.THRESH_BINARY)
@@ -101,45 +102,38 @@ class GpuFrame(Frame):
         self.m_T = camPara.outer[:3, 3]
         self.m_kp = None
         self.m_desc = None
-        a = cv.cuda_GpuMat()
-        a.upload(img)
-        self.m_img = a
-
-    def set_image(self, img):
-        self.m_desc = None
-        self.m_kp = None
-        self.m_img = cv.cuda_GpuMat(img)
-
-    def get_image(self):
-        return self.m_img.download()
+        self.m_img = img
 
     def _get_kp_and_desc(self):
-        detector = gpu_feature_detector
-        img = self.m_img
+        detector = self.__get_detector()
+        img = self.get_gpu_img()
         gray = cv.cuda.cvtColor(img, cv.COLOR_BGR2GRAY)
         _, mask = cv.cuda.threshold(gray, 1, 255, cv.THRESH_BINARY)
         kp, desc = detector.detectWithDescriptors(gray, mask)
         # write cache
-        self.m_kp = kp
-        self.m_desc = desc
+        self.m_kp = detector.downloadKeypoints(kp)
+        self.m_gpu_desc = desc
         return kp, desc
     
-    def get_kp(self):
-        if self.m_desc is None:
-            self._get_kp_and_desc()
-        return gpu_feature_detector.downloadKeypoints(self.m_kp)
+    def __get_detector(self):
+        return cv.cuda.SURF_CUDA_create(5)
     
-    def get_gpu_kp(self):
-        if self.m_desc is None:
-            self._get_kp_and_desc()
-        return gpu_feature_detector
+    def get_gpu_img(self):
+        a = cv.cuda_GpuMat()
+        a.upload(self.m_img)
+        return a
+    
+    def clear_gpu_cache(self):
+        self.m_gpu_desc = None
 
     def get_kp_description(self):
-        if self.m_desc is None:
+        if self.m_gpu_desc is None or self.m_desc is None:
             self._get_kp_and_desc()
-        return self.m_desc.download()
+        if self.m_desc is None:
+            self.m_desc = self.m_gpu_desc.download()
+        return self.m_desc
     
     def get_gpu_kp_description(self):
-        if self.m_desc is None:
+        if self.m_gpu_desc is None:
             self._get_kp_and_desc()
-        return self.m_desc
+        return self.m_gpu_desc
