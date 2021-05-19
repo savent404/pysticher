@@ -38,7 +38,7 @@ class SimulateFrameFactory(FrameFactory):
         self.m_method = "simulate"
         self.m_DOFs = DOFs
         self.m_img_list = imgList
-        self.m_index = 0
+        self.m_index = 50
         self.m_cam_param = camParam
 
     def get_frame(self, isGpu=False):

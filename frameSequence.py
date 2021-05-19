@@ -1,7 +1,10 @@
+from algo import get_padding_transform, gpu_get_padding_transform, gpu_merge_image
 from typing import List
 from frame import FrameInterface, Frame, GpuFrame
 import cv2 as cv
 import numpy as np
+import debug
+from loguru import logger
 import copy
 
 matcher = cv.BFMatcher()
@@ -17,7 +20,7 @@ def get_residual(src, dst, inner, M):
     assert(len(inner) == len(dst))
 
     for i in range(len(src)):
-        if inner[i] != 1:
+        if inner[i, 0] != 1:
             continue
         src_pt = src[i]
         dst_pt = dst[i]
@@ -31,10 +34,11 @@ def get_residual(src, dst, inner, M):
 class FrameSequenceInterface(FrameInterface):
     def __init__(self):
         super.__init__(self)
-    def add_frame(self, frame, match_ratio=0.6, max_residual=3):
+
+    def add_frame(self, frame, max_residual=3):
         pass
 
-class GpuFrameSequence(FrameSequenceInterface):
+class CpuFrameSequence(FrameSequenceInterface):
     def __init__(self):
         FrameInterface.__init__(self)
         self.m_frame_list: List[Frame] = []
@@ -76,6 +80,7 @@ class GpuFrameSequence(FrameSequenceInterface):
         rigid_m, _ = cv.estimateAffinePartial2D(src_pts, dst_pts)
 
         residual = get_residual(src_pts, dst_pts, rigid_m)
+
         if residual >= max_residual:
             return None
         return rigid_m
@@ -105,8 +110,49 @@ class GpuFrameSequence(FrameSequenceInterface):
     def __init__(self):
         FrameInterface.__init__(self)
         self.m_frame_list: List[GpuFrame] = []
-    
+
+    def add_frame(self, frame: GpuFrame, max_residual=3):
+        list = self.m_frame_list
+
+        if (len(list) == 0):
+            list.append(frame)
+            return True
+        
+        last_frame = list[-1]
+        rigid_m = self.__estimate_rigid_transform(last_frame, frame, max_residual)
+
+        if True:
+            origin = last_frame.get_gpu_img()
+            target = frame.get_gpu_img()
+
+            target = cv.cuda.warpAffine(target, rigid_m[0:2, :], target.size())
+            img = gpu_merge_image(origin, target)
+            img = img.download()
+            debug.display('merge', img)
+
+
+        if rigid_m is None:
+            return False
+
+        # 通常来讲上一帧只需要和当前帧做匹配，所以这里就可以gpu缓存了
+        # 当前帧的不进行清除，gpu缓存留到下一帧
+        last_frame.clear_cache()
+
+        # 更新当前frame的投影矩阵
+        M = np.dot(last_frame.get_M(), rigid_m)
+        frame.set_M(M)
+
+        # 添加到列表
+        list.append(frame)
+        return True
+
     def __estimate_rigid_transform(self, frame1:GpuFrame, frame2:GpuFrame, max_residual):
+        '''
+        获取两帧之间的刚性变换矩阵
+
+        frame1, frame2 Frame
+        max_residual 最大残差(平均到每个特侦点)
+        '''
         kp1, desc1 = frame1.get_kp(), frame1.get_gpu_kp_description()
         kp2, desc2 = frame2.get_kp(), frame2.get_gpu_kp_description()
 
@@ -116,46 +162,25 @@ class GpuFrameSequence(FrameSequenceInterface):
         matcher = cv.cuda.DescriptorMatcher_createBFMatcher()
         matches = matcher.knnMatch(desc2, desc1, k=2)
 
-        # good = []
-        # for m, n in matches:
-        #     if m.distance < match_ratio * n.distance:
-        #         good.append(m)
-        good = [m for m, n in matches]
+        match_ratio = 0.55
+        good = []
+        for m, n in matches:
+            if m.distance < match_ratio * n.distance:
+                good.append(m)
+        # good = [m for m, n in matches]
 
         src_pts = np.float32([kp2[m.queryIdx].pt for m in good])
         dst_pts = np.float32([kp1[m.trainIdx].pt for m in good])
 
+
         if len(src_pts) == 0 or len(dst_pts) == 0:
             return None
 
-        src_pts = src_pts.reshape((-1, 2))
-        dst_pts = dst_pts.reshape((-1, 2))
-
         rigid_m, inner = cv.estimateAffinePartial2D(src_pts, dst_pts)
-
         residual = get_residual(src_pts, dst_pts, inner, rigid_m)
+        logger.debug("inner pts:{}, redisual:{}".format(sum(inner[:, 0]), residual))
         if residual >= max_residual:
             return None
+
+        rigid_m = np.vstack([rigid_m, [0, 0, 1]])
         return rigid_m
-
-    def add_frame(self, frame: GpuFrame, match_ratio=0.6, max_residual=3):
-        list = self.m_frame_list
-
-        if (len(list) == 0):
-            list.append(frame)
-            return True
-        
-        last_frame = list[-1]
-        rigid_m = self.__estimate_rigid_transform(last_frame, frame, max_residual)
-        if rigid_m is None:
-            return False
-        proj_m = np.vstack([rigid_m, [0, 0, 1]])
-
-        # 通常来讲上一帧只需要和当前帧做匹配，所以这里就可以gpu缓存了
-        # 当前帧的不进行清除，gpu缓存留到下一帧
-        last_frame.clear_cache()
-        M = last_frame.get_M()
-        M = np.dot(M, proj_m)
-        frame.set_M(M)
-        list.append(frame)
-        return True
