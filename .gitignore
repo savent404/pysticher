@@ -1,0 +1,7 @@
+datasets
+__pycache__
+.vs
+.vscode
+*.jpg
+*.jpeg
+*.png
