@@ -4,6 +4,7 @@ from frameSequence import GpuFrameSequence
 from viewer import Viewer
 from loguru import logger
 from sticherRunner import sticher_runner
+import cv2 as cv
 
 
 class Sticher:
@@ -39,8 +40,7 @@ class Sticher:
         '''
         下载地图到文件
         '''
-        raise NotImplemented
-        # cv.imwrite(file_path, self.get_map())
+        cv.imwrite(file_path, self.get_map())
 
 
 if __name__ == '__main__':
