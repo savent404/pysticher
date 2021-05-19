@@ -86,7 +86,6 @@ class FrameInterface:
         pass
 
     def decomposeM(self, M):
-        # r, _, t = cv.decomposeEssentialMat(M)
         r = copy.copy(M)
         t = np.eye(3, dtype=np.float32)
         r[0, 2] = 0

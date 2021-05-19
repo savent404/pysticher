@@ -6,15 +6,16 @@ import threading
 import numpy as np
 import debug
 
+
 class Viewer:
     def __init__(self):
-        self.previwe_map = Map()
+        self.previwe_map = Map((500, 500, 3))  # 地图块选为500x500对应1080P的图像合并效率不错
         self.lock = threading.Lock()
-    
-    def add_frame(self, frame:Frame):
+
+    def add_frame(self, frame: Frame):
         raise NotImplementedError
 
-    def add_gpu_frame(self, frame:GpuFrame):
+    def add_gpu_frame(self, frame: GpuFrame):
         '''
 
         由于图像投影（旋转+平移）后需要进行平移确保所有图像均在投影屏幕内，需要叠加一个move平移矩阵
@@ -25,16 +26,17 @@ class Viewer:
         R, T = frame.get_R(), frame.get_T()
         img = frame.get_gpu_img()
 
-        move, size= gpu_get_padding_transform(img, transform=R)
+        move, size = gpu_get_padding_transform(img, transform=R)
         warp_m = np.dot(move, R)
         warped = cv.cuda.warpAffine(img, warp_m[0:2, :], size)
-        warped = warped.download()
+        # warped = warped.download()
 
         move_inv = np.linalg.inv(move)
         warp_T = np.dot(move_inv, T)
         x, y = warp_T[0, 2], warp_T[1, 2]
         pos = (x, y)
-        self.previwe_map.update(warped, pos)
+        self.previwe_map.update(warped.download(), pos)
+        self.previwe_map.update_gpu(warped, pos)
         self.lock.release()
 
     def do_view(self):

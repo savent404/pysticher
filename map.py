@@ -276,7 +276,7 @@ class Map:
                 img = cv2.cuda_GpuMat()
                 img.upload(block.image)
                 roi = cv2.cuda_GpuMat(mat, (yStart, yEnd), (xStart, xEnd))
-                roi = img
+                img.copyTo(roi)
         return mat
 
     def __getImage_RealSpace(self, start, end):
@@ -420,7 +420,7 @@ class Map:
         c_w, c_h = combine.size()
         bigger_img = cv2.cuda_GpuMat(c_h, c_w, cv2.CV_8UC3)
         roi = cv2.cuda_GpuMat(bigger_img, (sy, ey), (sx, ex))
-        roi = img
+        img.copyTo(roi)
         if order == 1:
             combine = gpu_merge_image(bigger_img, combine)
         elif order == 2:
